@@ -1,0 +1,668 @@
+{% extends "base.html" %}
+
+{% block title %}Laporan Penjualan - {{ store_name }}{% endblock %}
+{% block page_title %}Laporan Penjualan & Analisis Transaksi{% endblock %}
+{% block page_subtitle %}Rekapitulasi penjualan bulanan, analisis keuntungan kotor, produk terlaris, dan ekspor data Excel{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- TOP NAVIGATION TABS (MONTHLY VS TRANSACTION HISTORY) -->
+    <div class="flex items-center justify-between border-b border-slate-200 pb-3 flex-wrap gap-3">
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="switchReportTab('tab-monthly', this)"
+                    class="report-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if active_tab == 'monthly' else 'bg-white text-slate-600 border border-slate-200 hover:border-brand-500 hover:bg-slate-50' }}">
+                <i class="fa-solid fa-calendar-days mr-1.5"></i> Laporan Rekapitulasi Bulanan
+            </button>
+            <button type="button" onclick="switchReportTab('tab-history', this)"
+                    class="report-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if active_tab == 'history' else 'bg-white text-slate-600 border border-slate-200 hover:border-brand-500 hover:bg-slate-50' }}">
+                <i class="fa-solid fa-receipt mr-1.5"></i> Riwayat Nota Transaksi
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Dynamic Excel Export Button based on active tab -->
+            <a id="btn-export-excel"
+               href="{{ url_for('export_excel', type='monthly', month=selected_month, year=selected_year) }}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all">
+                <i class="fa-solid fa-file-excel text-sm"></i>
+                <span>Ekspor ke Excel (.xlsx)</span>
+            </a>
+
+            <button onclick="window.print()" class="px-3.5 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                <i class="fa-solid fa-print"></i>
+                <span>Cetak Rekap</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: MODUL LAPORAN PENJUALAN BULANAN (MONTHLY SALES REPORT)   -->
+    <!-- ============================================================== -->
+    <div id="tab-monthly" class="{{ 'hidden' if active_tab != 'monthly' else '' }} space-y-6">
+        
+        <!-- MONTH & YEAR FILTER BAR -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <form method="GET" action="{{ url_for('reports') }}" class="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="tab" value="monthly">
+                
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pilih Bulan:</span>
+                    <select name="month" class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-brand-500">
+                        {% for m_num, m_label in available_months %}
+                        <option value="{{ m_num }}" {{ 'selected' if selected_month == m_num else '' }}>{{ m_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tahun:</span>
+                    <select name="year" class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-brand-500">
+                        {% for yr in available_years %}
+                        <option value="{{ yr }}" {{ 'selected' if selected_year == yr else '' }}>{{ yr }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-brand-600/20">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Tampilkan Rekap</span>
+                </button>
+            </form>
+
+            <div class="text-xs text-slate-500 font-medium">
+                Periode Terpilih: <strong class="text-brand-700 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-200">{{ selected_month_name }} {{ selected_year }}</strong>
+            </div>
+        </div>
+
+        <!-- MONTHLY KPI CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 {{ 'lg:grid-cols-4' if is_admin else 'lg:grid-cols-2' }} gap-4">
+            <!-- Total Omzet Bulan Ini -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden group hover:border-brand-500/50 transition-all">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Omzet (Bulan Ini)</span>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-rupiah-sign"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h3 class="text-2xl font-black text-slate-800 tracking-tight">{{ monthly_summary.total_omzet | rupiah }}</h3>
+                    <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <i class="fa-solid fa-chart-line text-brand-500"></i>
+                        <span>Pendapatan bruto {{ selected_month_name }} {{ selected_year }}</span>
+                    </p>
+                </div>
+            </div>
+
+            {% if is_admin %}
+            <!-- Total Modal Pokok / HPP -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden group hover:border-slate-400 transition-all">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Modal Pokok (HPP)</span>
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h3 class="text-2xl font-black text-slate-600 tracking-tight">{{ monthly_summary.total_cost | rupiah }}</h3>
+                    <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <i class="fa-solid fa-tag text-slate-400"></i>
+                        <span>Harga pokok pembelian barang</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Total Keuntungan Kotor (Profit) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden group hover:border-indigo-400 transition-all">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Keuntungan Kotor (Profit)</span>
+                    <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-arrow-trend-up"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h3 class="text-2xl font-black text-indigo-600 tracking-tight">{{ monthly_summary.total_profit | rupiah }}</h3>
+                    {% set monthly_margin = ((monthly_summary.total_profit / monthly_summary.total_omzet * 100) | round(1)) if monthly_summary.total_omzet > 0 else 0 %}
+                    <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <i class="fa-solid fa-percent text-indigo-500"></i>
+                        <span>Margin keuntungan: <strong class="text-indigo-600">{{ monthly_margin }}%</strong></span>
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Total Transaksi -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden group hover:border-amber-400 transition-all">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Transaksi</span>
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-receipt"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h3 class="text-2xl font-black text-slate-800 tracking-tight">{{ monthly_summary.trx_count }} <span class="text-sm font-normal text-slate-500">Struk</span></h3>
+                    {% set aov = (monthly_summary.total_omzet / monthly_summary.trx_count) if monthly_summary.trx_count > 0 else 0 %}
+                    <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                        <i class="fa-solid fa-basket-shopping text-amber-500"></i>
+                        <span>Rata-rata: {{ aov | rupiah }} / nota</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MONTHLY SALES CHART (GRAFIK HARIAN BULAN INI) -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Grafik Pergerakan Penjualan Harian - {{ selected_month_name }} {{ selected_year }}</h3>
+                    <p class="text-xs text-slate-400">Statistik omzet dan laba per tanggal sepanjang bulan</p>
+                </div>
+                <div class="flex items-center gap-4 text-xs font-semibold">
+                    <span class="flex items-center gap-1.5 text-slate-600">
+                        <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Omzet Penjualan
+                    </span>
+                    {% if is_admin %}
+                    <span class="flex items-center gap-1.5 text-slate-600">
+                        <span class="w-3 h-3 rounded-full bg-indigo-500 inline-block"></span> Keuntungan Kotor
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="h-64 sm:h-72 w-full">
+                <canvas id="monthlyTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 2 COLUMNS: TOP SELLING ITEMS & DAILY BREAKDOWN TABLE -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- TOP SELLING ITEMS IN SELECTED MONTH -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-fire text-amber-500"></i>
+                            <span>Produk Terlaris Bulan {{ selected_month_name }}</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Peringkat 10 produk paling laku berdasarkan kuantitas terjual</p>
+                    </div>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        Top Selling
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-100 uppercase tracking-wider font-semibold">
+                                <th class="pb-2 text-center w-8">#</th>
+                                <th class="pb-2">Nama Produk & Barcode</th>
+                                <th class="pb-2 text-center">Terjual</th>
+                                <th class="pb-2 text-right">Total Omzet</th>
+                                {% if is_admin %}<th class="pb-2 text-right">Laba</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% if monthly_top_selling %}
+                                {% for item in monthly_top_selling %}
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="py-2.5 text-center">
+                                        <span class="w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-black
+                                            {{ 'bg-amber-400 text-amber-950' if loop.index == 1 else ('bg-slate-300 text-slate-800' if loop.index == 2 else ('bg-amber-700 text-white' if loop.index == 3 else 'bg-slate-100 text-slate-600')) }}">
+                                            {{ loop.index }}
+                                        </span>
+                                    </td>
+                                    <td class="py-2.5 font-bold text-slate-800">
+                                        <div>{{ item.product_name }}</div>
+                                        <span class="text-[10px] text-slate-400 font-mono">{{ item.sku }}</span>
+                                    </td>
+                                    <td class="py-2.5 text-center font-black font-mono text-brand-700 bg-brand-50/50">
+                                        {{ item.total_qty }} unit
+                                    </td>
+                                    <td class="py-2.5 text-right font-black font-mono text-slate-800">
+                                        {{ item.total_sales | rupiah }}
+                                    </td>
+                                    {% if is_admin %}
+                                    <td class="py-2.5 text-right font-black font-mono text-emerald-600">
+                                        {{ item.total_profit | rupiah }}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="py-10 text-center text-slate-400">
+                                        <i class="fa-solid fa-box-open text-2xl mb-1 text-slate-300"></i>
+                                        <p>Belum ada produk terjual pada bulan ini.</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DAILY BREAKDOWN TABLE IN SELECTED MONTH -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-day text-indigo-500"></i>
+                            <span>Rekapitulasi Harian Bulan {{ selected_month_name }}</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Rincian performa transaksi per tanggal aktif</p>
+                    </div>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {{ daily_records | length }} Hari Aktif
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto flex-1 max-h-[380px]">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50/80 sticky top-0 border-b border-slate-100">
+                            <tr class="text-slate-400 uppercase tracking-wider font-semibold">
+                                <th class="py-2 px-2">Tanggal</th>
+                                <th class="py-2 text-center">Transaksi</th>
+                                <th class="py-2 text-right">Omzet</th>
+                                {% if is_admin %}<th class="py-2 text-right">Laba Kotor</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% if daily_records %}
+                                {% for day in daily_records %}
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="py-2 px-2 font-mono font-bold text-slate-800">
+                                        {{ day.full_date }}
+                                    </td>
+                                    <td class="py-2 text-center font-mono text-slate-600">
+                                        <span class="bg-slate-100 px-2 py-0.5 rounded font-bold">{{ day.trx_count }} struk</span>
+                                    </td>
+                                    <td class="py-2 text-right font-black font-mono text-slate-800">
+                                        {{ day.daily_omzet | rupiah }}
+                                    </td>
+                                    {% if is_admin %}
+                                    <td class="py-2 text-right font-black font-mono text-emerald-600">
+                                        {{ day.daily_profit | rupiah }}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="py-10 text-center text-slate-400">
+                                        <p>Tidak ada riwayat transaksi pada bulan {{ selected_month_name }} {{ selected_year }}.</p>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: RIWAYAT TRANSAKSI & NOTA KASIR LENGKAP                   -->
+    <!-- ============================================================== -->
+    <div id="tab-history" class="{{ 'hidden' if active_tab != 'history' else '' }} space-y-6">
+        
+        <!-- DATE RANGE FILTER BAR -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <form method="GET" action="{{ url_for('reports') }}" class="flex flex-wrap items-center gap-3 flex-1">
+                <input type="hidden" name="tab" value="history">
+
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Periode:</span>
+                    <input type="date" name="start_date" value="{{ start_date }}"
+                           class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-mono text-slate-700 focus:ring-2 focus:ring-brand-500">
+                    <span class="text-xs text-slate-400">s/d</span>
+                    <input type="date" name="end_date" value="{{ end_date }}"
+                           class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-mono text-slate-700 focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div class="relative flex-1 min-w-[180px]">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    </div>
+                    <input type="text" name="q" value="{{ search_inv }}" placeholder="Cari No. Faktur / Pelanggan..."
+                           class="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Terapkan</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- RANGE SUMMARY KPI STATS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 {{ 'lg:grid-cols-4' if is_admin else 'lg:grid-cols-2' }} gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Omzet Penjualan</span>
+                <h3 class="text-2xl font-black text-slate-800 tracking-tight mt-2">{{ summary.total_omzet | rupiah }}</h3>
+                <p class="text-[11px] text-slate-400 mt-1">Total pembayaran bruto</p>
+            </div>
+
+            {% if is_admin %}
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Modal Pokok (HPP)</span>
+                <h3 class="text-2xl font-black text-slate-600 tracking-tight mt-2">{{ summary.total_cost | rupiah }}</h3>
+                <p class="text-[11px] text-slate-400 mt-1">Harga pokok barang terjual</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Keuntungan Kotor (Laba)</span>
+                <h3 class="text-2xl font-black text-emerald-600 tracking-tight mt-2">{{ summary.total_profit | rupiah }}</h3>
+                <p class="text-[11px] text-slate-400 mt-1">Omzet dikurangi modal</p>
+            </div>
+            {% endif %}
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Transaksi</span>
+                <h3 class="text-2xl font-black text-indigo-600 tracking-tight mt-2">{{ summary.trx_count }} <span class="text-xs font-normal text-slate-500">Struk</span></h3>
+                <p class="text-[11px] text-slate-400 mt-1">Faktur berhasil diselesaikan</p>
+            </div>
+        </div>
+
+        <!-- TRANSACTIONS LIST TABLE -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                        <tr>
+                            <th class="py-3 px-4">No. Faktur</th>
+                            <th class="py-3 px-3">Tanggal & Jam</th>
+                            <th class="py-3 px-3">Kasir</th>
+                            <th class="py-3 px-3">Pelanggan</th>
+                            <th class="py-3 px-3 text-center">Metode</th>
+                            <th class="py-3 px-3 text-center">Item</th>
+                            <th class="py-3 px-3 text-right">Total Transaksi</th>
+                            <th class="py-3 px-4 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% if transactions %}
+                            {% for t in transactions %}
+                            <tr class="hover:bg-slate-50/70 transition-colors">
+                                <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ t.invoice_number }}</td>
+                                <td class="py-3 px-3 font-mono text-slate-500">{{ t.date | datetime_format }}</td>
+                                <td class="py-3 px-3 text-slate-600 font-medium">{{ t.cashier_name or '-' }}</td>
+                                <td class="py-3 px-3 text-slate-700">{{ t.customer_name }}</td>
+                                <td class="py-3 px-3 text-center">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold {{ 'bg-emerald-100 text-emerald-800' if t.payment_method == 'CASH' else 'bg-blue-100 text-blue-800' }}">
+                                        {{ t.payment_method }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-3 text-center font-mono text-slate-600">{{ t.total_items }} macam</td>
+                                <td class="py-3 px-3 text-right font-black text-slate-800 font-mono text-sm">{{ t.total_amount | rupiah }}</td>
+                                <td class="py-3 px-4 text-center">
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <button onclick="viewReceipt('{{ t.invoice_number }}')" title="Cetak Ulang / Tampilkan Struk"
+                                                class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 transition-colors">
+                                            <i class="fa-solid fa-receipt text-brand-600"></i>
+                                            <span>Struk</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="py-12 text-center text-slate-400">
+                                    <i class="fa-solid fa-receipt text-3xl mb-2 text-slate-300"></i>
+                                    <p class="text-sm font-semibold">Tidak ada transaksi pada periode yang dipilih.</p>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ================= THERMAL RECEIPT MODAL FOR REPRINT ================= -->
+<div id="thermal-receipt-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 relative max-h-[95vh] flex flex-col">
+        <div class="no-print flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+            <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-receipt text-brand-600"></i>
+                <span>Cetak Ulang Struk</span>
+            </span>
+            <button onclick="closeReceiptModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <div class="overflow-y-auto flex-1 p-1">
+            <div id="printable-receipt" class="receipt-container {{ 'receipt-80mm' if receipt_paper_size == '80mm' else '' }}">
+                <div class="text-center">
+                    <h3 id="receipt-store-name" class="font-bold text-sm uppercase tracking-wider">{{ store_name }}</h3>
+                    <p id="receipt-store-address" class="text-[10px] text-slate-600">{{ store_address }}</p>
+                    <p id="receipt-store-phone" class="text-[10px] text-slate-600">Telp: {{ store_phone }}</p>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <div class="text-[10px] space-y-0.5">
+                    <div class="flex justify-between">
+                        <span>No Faktur:</span>
+                        <span id="receipt-invoice" class="font-bold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Tanggal:</span>
+                        <span id="receipt-date">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Kasir:</span>
+                        <span id="receipt-cashier">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Pelanggan:</span>
+                        <span id="receipt-customer">-</span>
+                    </div>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <div id="receipt-items-list" class="space-y-1"></div>
+
+                <div class="receipt-double-divider"></div>
+
+                <div class="space-y-1 text-xs">
+                    <div class="flex justify-between font-black text-sm">
+                        <span>TOTAL:</span>
+                        <span id="receipt-total">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] pt-1">
+                        <span id="receipt-payment-method">BAYAR:</span>
+                        <span id="receipt-payment-amount">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-[11px]">
+                        <span>KEMBALIAN:</span>
+                        <span id="receipt-change">Rp 0</span>
+                    </div>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <div class="text-center text-[10px] text-slate-600 mt-2 space-y-1">
+                    <p id="receipt-footer-text" class="whitespace-pre-line"></p>
+                    <p class="text-[9px] text-slate-400 font-mono mt-2">*** SALINAN / CETAK ULANG STRUK ***</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="no-print pt-3 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+            <button type="button" onclick="closeReceiptModal()"
+                    class="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                Tutup
+            </button>
+            <button type="button" onclick="window.print()"
+                    class="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md transition-colors flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-print"></i>
+                <span>Cetak Thermal</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let monthlyChart = null;
+
+    // Switch between Monthly Report and Transaction History tabs
+    function switchReportTab(tabId, btnEl) {
+        document.getElementById('tab-monthly').classList.add('hidden');
+        document.getElementById('tab-history').classList.add('hidden');
+        document.getElementById(tabId).classList.remove('hidden');
+
+        document.querySelectorAll('.report-tab-btn').forEach(btn => {
+            btn.className = "report-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:border-brand-500 hover:bg-slate-50";
+        });
+        if (btnEl) {
+            btnEl.className = "report-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
+        }
+
+        // Update Excel download button URL dynamically
+        const exportBtn = document.getElementById('btn-export-excel');
+        if (tabId === 'tab-monthly') {
+            exportBtn.href = "{{ url_for('export_excel', type='monthly', month=selected_month, year=selected_year) }}";
+        } else {
+            exportBtn.href = "{{ url_for('export_excel', type='range', start_date=start_date, end_date=end_date, q=search_inv) }}";
+        }
+    }
+
+    // Initialize Monthly Sales Chart using Chart.js
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('monthlyTrendChart');
+        if (ctx) {
+            const labels = {{ chart_days | safe }};
+            const omzetData = {{ chart_monthly_omzet | safe }};
+            const profitData = {{ chart_monthly_profit | safe }};
+
+            monthlyChart = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Omzet (Penjualan)',
+                            data: omzetData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                            hoverBackgroundColor: 'rgba(5, 150, 105, 1)',
+                            borderRadius: 6,
+                            borderSkipped: false
+                        },
+                        {% if is_admin %}
+                        {
+                            label: 'Keuntungan Kotor (Laba)',
+                            data: profitData,
+                            backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                            hoverBackgroundColor: 'rgba(79, 70, 229, 1)',
+                            borderRadius: 6,
+                            borderSkipped: false
+                        }
+                        {% endif %}
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return 'Tanggal ' + context[0].label + ' {{ selected_month_name }} {{ selected_year }}';
+                                },
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatRupiah(context.raw);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    if (value >= 1000000) return (value / 1000000).toFixed(1) + ' Jt';
+                                    if (value >= 1000) return (value / 1000).toFixed(0) + ' Rb';
+                                    return value;
+                                },
+                                font: { size: 10 }
+                            },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: {
+                            ticks: { font: { size: 10 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    // View Receipt modal logic for reprint
+    async function viewReceipt(invoiceNumber) {
+        try {
+            const res = await fetch(`/api/pos/receipt/${invoiceNumber}`);
+            const data = await res.json();
+            if (data.success) {
+                const trx = data.transaction;
+                const items = data.items;
+                const store = data.store;
+
+                document.getElementById('receipt-store-name').innerText = store.name;
+                document.getElementById('receipt-store-address').innerText = store.address;
+                document.getElementById('receipt-store-phone').innerText = 'Telp: ' + store.phone;
+                document.getElementById('receipt-invoice').innerText = trx.invoice_number;
+                document.getElementById('receipt-date').innerText = trx.date;
+                document.getElementById('receipt-cashier').innerText = trx.cashier_name || 'Kasir';
+                document.getElementById('receipt-customer').innerText = trx.customer_name || 'Pelanggan Umum';
+
+                const itemsList = document.getElementById('receipt-items-list');
+                itemsList.innerHTML = '';
+                items.forEach(it => {
+                    const div = document.createElement('div');
+                    div.className = 'mb-1.5';
+                    div.innerHTML = `
+                        <div class="font-bold text-left">${it.product_name}</div>
+                        <div class="flex justify-between text-[11px] text-slate-600">
+                            <span>${it.qty} x ${formatRupiah(it.sell_price)}</span>
+                            <span class="font-bold">${formatRupiah(it.subtotal)}</span>
+                        </div>
+                    `;
+                    itemsList.appendChild(div);
+                });
+
+                document.getElementById('receipt-total').innerText = formatRupiah(trx.total_amount);
+                document.getElementById('receipt-payment-method').innerText = `BAYAR (${trx.payment_method})`;
+                document.getElementById('receipt-payment-amount').innerText = formatRupiah(trx.payment_amount);
+                document.getElementById('receipt-change').innerText = formatRupiah(trx.change_amount);
+                document.getElementById('receipt-footer-text').innerText = store.footer;
+
+                document.getElementById('thermal-receipt-modal').classList.remove('hidden');
+            }
+        } catch (e) {
+            showToast('Gagal memuat struk faktur.', 'danger');
+        }
+    }
+
+    function closeReceiptModal() {
+        document.getElementById('thermal-receipt-modal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

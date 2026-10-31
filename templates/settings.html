@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Pengaturan Toko & Pengguna - {{ store_name }}{% endblock %}
+{% block page_title %}Pengaturan Sistem & Manajemen Pengguna{% endblock %}
+{% block page_subtitle %}Konfigurasi profil toko, format printer struk thermal, dan hak akses pengguna kasir{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- ================= STORE & RECEIPT SETTINGS (2 COLS) ================= -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+                <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Profil Toko & Pengaturan Struk</h3>
+                    <p class="text-xs text-slate-400">Informasi ini akan tercetak otomatis pada header dan footer struk thermal belanja</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('settings') }}" class="mt-5 space-y-4">
+                <input type="hidden" name="action" value="store_info">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Nama Toko *</label>
+                        <input type="text" name="store_name" value="{{ store_name }}" required
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">No. Telepon / WhatsApp</label>
+                        <input type="text" name="store_phone" value="{{ store_phone }}"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Alamat Lengkap Toko</label>
+                    <input type="text" name="store_address" value="{{ store_address }}"
+                           class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Ukuran Kertas Printer Thermal</label>
+                        <select name="receipt_paper_size" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-brand-500">
+                            <option value="58mm" {{ 'selected' if receipt_paper_size == '58mm' else '' }}>58 mm (Printer Kasir Mini Portabel)</option>
+                            <option value="80mm" {{ 'selected' if receipt_paper_size == '80mm' else '' }}>80 mm (Printer Thermal Desktop Standar)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Pesan Penutup Struk (Footer)</label>
+                    <textarea name="receipt_footer" rows="3"
+                              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-brand-500">{{ receipt_footer }}</textarea>
+                    <span class="text-[11px] text-slate-400 mt-0.5 block">Dapat berupa ucapan terima kasih atau syarat & ketentuan penukaran barang.</span>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex justify-end">
+                    <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-600/20 transition-all">
+                        <i class="fa-solid fa-floppy-disk mr-1.5"></i> Simpan Profil Toko
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ================= ADD NEW USER (1 COL) ================= -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-user-plus"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Tambah Akun Pengguna</h3>
+                    <p class="text-xs text-slate-400">Admin atau Kasir baru</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('settings') }}" class="mt-5 space-y-3.5">
+                <input type="hidden" name="action" value="add_user">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nama Lengkap *</label>
+                    <input type="text" name="full_name" required placeholder="Contoh: Rian Kasir 2"
+                           class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Username Login *</label>
+                    <input type="text" name="username" required placeholder="rian"
+                           class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Peran (Hak Akses) *</label>
+                    <select name="role" class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-brand-500">
+                        <option value="cashier">Kasir (Hanya POS & Riwayat)</option>
+                        <option value="admin">Admin / Pemilik (Akses Penuh)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Kata Sandi *</label>
+                    <input type="password" name="password" required placeholder="••••••••"
+                           class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Daftarkan Pengguna</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- ================= USERS TABLE ================= -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden p-6">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+                <h3 class="text-base font-bold text-slate-800">Daftar Pengguna Terdaftar</h3>
+                <p class="text-xs text-slate-400">Kelola akun dan otorisasi login staf retail</p>
+            </div>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">{{ users | length }} Pengguna</span>
+        </div>
+
+        <div class="overflow-x-auto mt-4">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="text-slate-400 font-semibold border-b border-slate-100 uppercase tracking-wider">
+                        <th class="pb-2.5">Nama Staf</th>
+                        <th class="pb-2.5">Username</th>
+                        <th class="pb-2.5">Hak Akses</th>
+                        <th class="pb-2.5">Terdaftar Sejak</th>
+                        <th class="pb-2.5 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for u in users %}
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-3 font-bold text-slate-800 flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 text-xs">
+                                {{ u.full_name[0] }}
+                            </div>
+                            <span>{{ u.full_name }}</span>
+                        </td>
+                        <td class="py-3 font-mono text-slate-600">{{ u.username }}</td>
+                        <td class="py-3">
+                            {% if u.role == 'admin' %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                                <i class="fa-solid fa-shield-halved text-[9px] mr-1"></i> Admin / Pemilik
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                <i class="fa-solid fa-user text-[9px] mr-1"></i> Kasir
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-slate-400 font-mono">{{ u.created_at }}</td>
+                        <td class="py-3 text-center">
+                            {% if u.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('settings') }}" onsubmit="return confirm('Hapus pengguna {{ u.full_name }}?');" class="inline">
+                                <input type="hidden" name="action" value="delete_user">
+                                <input type="hidden" name="user_id" value="{{ u.id }}">
+                                <button type="submit" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors" title="Hapus Pengguna">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-[10px] text-slate-400 italic">(Akun Anda)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

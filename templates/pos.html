@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Kasir POS - {{ store_name }}{% endblock %}
+{% block page_title %}Terminal Kasir (Point of Sale){% endblock %}
+{% block page_subtitle %}Pencarian cepat, barcode scanner otomatis, kalkulator transaksi, dan cetak struk{% endblock %}
+
+{% block content %}
+<div class="h-full flex flex-col lg:flex-row gap-5 pb-6">
+
+    <!-- ================= LEFT COLUMN: CATALOG & BARCODE SCANNER ================= -->
+    <div class="flex-1 flex flex-col min-w-0 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 overflow-hidden">
+        
+        <!-- BARCODE & SEARCH INPUT -->
+        <div class="flex items-center gap-2 mb-3">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-brand-600">
+                    <i class="fa-solid fa-barcode text-lg"></i>
+                </div>
+                <input type="text" id="barcode-input" autofocus
+                       placeholder="Scan barcode scanner atau ketik nama produk... (Tekan Enter)"
+                       class="w-full pl-11 pr-24 py-3 rounded-xl border-2 border-brand-500/30 focus:border-brand-600 focus:ring-4 focus:ring-brand-500/10 text-sm font-medium transition-all shadow-sm">
+                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <span class="text-[10px] font-mono font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md border border-slate-200">
+                        [F1] Cari
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CATEGORY FILTER PILLS -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none flex-shrink-0">
+            <button type="button" onclick="posTerminal.filterCategory('all', this)"
+                    class="cat-pill px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-brand-600 text-white shadow-md flex-shrink-0">
+                Semua Produk
+            </button>
+            {% for cat in categories %}
+            <button type="button" onclick="posTerminal.filterCategory('{{ cat.id }}', this)"
+                    class="cat-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition-all bg-white text-slate-600 border border-slate-200 hover:border-brand-500 hover:text-brand-600 flex-shrink-0">
+                {{ cat.name }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- PRODUCT GRID -->
+        <div class="flex-1 overflow-y-auto mt-2 pr-1">
+            <div id="product-grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                {% for p in products %}
+                {% set is_out = (p.stock == 0) %}
+                {% set is_low = (p.stock <= p.min_stock and p.stock > 0) %}
+                <div onclick="posTerminal.addToCartById({{ p.id }})"
+                     data-id="{{ p.id }}"
+                     data-name="{{ p.name }}"
+                     data-sku="{{ p.sku }}"
+                     data-category="{{ p.category_id or '' }}"
+                     class="product-card group relative p-3 rounded-xl border border-slate-200 bg-white hover:border-brand-500 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer select-none {{ 'opacity-60 bg-slate-50 cursor-not-allowed' if is_out else '' }}">
+                    
+                    <div>
+                        <!-- Category & Stock Status Badge -->
+                        <div class="flex items-center justify-between gap-1 mb-1.5">
+                            <span class="text-[10px] text-slate-400 font-medium truncate">{{ p.category_name or 'Umum' }}</span>
+                            {% if is_out %}
+                            <span class="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">Habis</span>
+                            {% elif is_low %}
+                            <span class="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse">Sisa {{ p.stock }}</span>
+                            {% else %}
+                            <span class="text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Stok: {{ p.stock }}</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Product Name -->
+                        <h4 class="text-xs font-bold text-slate-800 line-clamp-2 leading-tight group-hover:text-brand-700 transition-colors">
+                            {{ p.name }}
+                        </h4>
+                        <!-- Barcode -->
+                        <span class="text-[10px] font-mono text-slate-400 mt-1 block truncate">
+                            <i class="fa-solid fa-barcode text-[9px] mr-0.5"></i>{{ p.sku }}
+                        </span>
+                    </div>
+
+                    <!-- Price & Add Button -->
+                    <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span class="text-xs font-black text-brand-600 font-mono">{{ p.sell_price | rupiah }}</span>
+                        <div class="w-6 h-6 rounded-lg bg-brand-50 text-brand-600 group-hover:bg-brand-600 group-hover:text-white flex items-center justify-center text-xs transition-colors">
+                            <i class="fa-solid fa-plus"></i>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= RIGHT COLUMN: SHOPPING CART & CHECKOUT ================= -->
+    <div class="w-full lg:w-96 flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 overflow-hidden flex-shrink-0">
+        
+        <!-- CART HEADER -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-basket-shopping text-brand-600"></i>
+                <h3 class="text-sm font-bold text-slate-800">Keranjang Kasir</h3>
+                <span id="total-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700">0 item</span>
+            </div>
+            <button type="button" onclick="posTerminal.clearCart()" title="Kosongkan Keranjang [F4]"
+                    class="text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1 font-semibold">
+                <i class="fa-solid fa-trash-can text-[11px]"></i>
+                <span>Reset [F4]</span>
+            </button>
+        </div>
+
+        <!-- CUSTOMER NAME INPUT -->
+        <div class="py-2.5 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-user text-slate-400 text-xs"></i>
+                <input type="text" id="customer-name-input" value="Pelanggan Umum" placeholder="Nama Pelanggan..."
+                       class="w-full text-xs font-medium text-slate-700 border-none p-0 focus:ring-0 placeholder:text-slate-400">
+            </div>
+        </div>
+
+        <!-- CART ITEMS LIST CONTAINER -->
+        <div class="flex-1 overflow-y-auto py-2.5 min-h-[160px] max-h-[260px] lg:max-h-none space-y-2 pr-1">
+            <!-- Empty State -->
+            <div id="cart-empty" class="h-full flex flex-col items-center justify-center text-center py-10 text-slate-400">
+                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 text-xl mb-2">
+                    <i class="fa-solid fa-cart-arrow-down"></i>
+                </div>
+                <p class="text-xs font-semibold">Keranjang masih kosong</p>
+                <span class="text-[10px] text-slate-400">Scan barcode atau klik produk di katalog</span>
+            </div>
+
+            <!-- Dynamic Cart Items Container -->
+            <div id="cart-items" class="space-y-2 hidden"></div>
+        </div>
+
+        <!-- PAYMENT CALCULATOR & SUMMARY -->
+        <div class="pt-3 border-t border-slate-200/80 space-y-3 flex-shrink-0 bg-white">
+            
+            <!-- TOTAL BILLING HIGHLIGHT -->
+            <div class="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between shadow-inner">
+                <div>
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 tracking-wider">Total Tagihan</span>
+                    <h2 id="total-display" class="text-2xl font-black text-emerald-400 font-mono tracking-tight">Rp 0</h2>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block">Subtotal</span>
+                    <span id="subtotal-display" class="text-xs font-mono font-medium text-slate-300">Rp 0</span>
+                </div>
+            </div>
+
+            <!-- PAYMENT METHOD TABS -->
+            <div class="grid grid-cols-3 gap-1.5">
+                <button type="button" onclick="posTerminal.setPaymentMethod('CASH', this)"
+                        class="pay-method-btn py-2 px-1 text-center rounded-xl border border-brand-600 bg-brand-50/70 text-brand-700 text-xs font-bold transition-all">
+                    <i class="fa-solid fa-money-bill-wave block text-sm mb-0.5"></i> Tunai
+                </button>
+                <button type="button" onclick="posTerminal.setPaymentMethod('QRIS', this)"
+                        class="pay-method-btn py-2 px-1 text-center rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold transition-all hover:bg-slate-50">
+                    <i class="fa-solid fa-qrcode block text-sm mb-0.5"></i> QRIS
+                </button>
+                <button type="button" onclick="posTerminal.setPaymentMethod('TRANSFER', this)"
+                        class="pay-method-btn py-2 px-1 text-center rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold transition-all hover:bg-slate-50">
+                    <i class="fa-solid fa-building-columns block text-sm mb-0.5"></i> Transfer
+                </button>
+            </div>
+
+            <!-- CASH PAYMENT SECTION -->
+            <div id="cash-details-section" class="space-y-2.5">
+                <!-- Cash Input Field -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] font-semibold text-slate-600 uppercase">Uang Tunai Diterima [F2]</label>
+                        <button type="button" onclick="posTerminal.setExactCash()"
+                                class="text-[10px] font-bold text-brand-600 hover:text-brand-700 hover:underline">
+                            Uang Pas
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-bold text-xs text-slate-400">Rp</span>
+                        <input type="number" id="cash-input" placeholder="0" min="0" step="1000"
+                               class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-sm font-black font-mono focus:ring-2 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <!-- Cash Quick Shortcut Buttons -->
+                <div class="grid grid-cols-4 gap-1.5">
+                    <button type="button" onclick="posTerminal.addCashPreset(10000)" class="py-1 px-1 text-[11px] font-mono font-bold rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700">10rb</button>
+                    <button type="button" onclick="posTerminal.addCashPreset(20000)" class="py-1 px-1 text-[11px] font-mono font-bold rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700">20rb</button>
+                    <button type="button" onclick="posTerminal.addCashPreset(50000)" class="py-1 px-1 text-[11px] font-mono font-bold rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700">50rb</button>
+                    <button type="button" onclick="posTerminal.addCashPreset(100000)" class="py-1 px-1 text-[11px] font-mono font-bold rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700">100rb</button>
+                </div>
+
+                <!-- Kembalian Display -->
+                <div id="change-container" class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 transition-colors">
+                    <span class="text-xs font-semibold text-slate-600">Kembalian:</span>
+                    <span id="change-display" class="text-sm font-black font-mono text-slate-800">Rp 0</span>
+                </div>
+            </div>
+
+            <!-- CHECKOUT BUTTON -->
+            <button type="button" id="checkout-btn" disabled onclick="posTerminal.processCheckout()"
+                    class="w-full py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-lg shadow-brand-600/30 transition-all flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
+                <i class="fa-solid fa-check-circle text-lg"></i>
+                <span>Selesaikan Pembayaran (Bayar)</span>
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ================= THERMAL RECEIPT MODAL (58mm / 80mm) ================= -->
+<div id="thermal-receipt-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 relative max-h-[95vh] flex flex-col">
+        
+        <!-- Modal Action Header (Hidden during print) -->
+        <div class="no-print flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+            <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-receipt text-brand-600"></i>
+                <span>Struk Transaksi Selesai</span>
+            </span>
+            <button onclick="posTerminal.closeReceiptModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <!-- Receipt Body Container -->
+        <div class="overflow-y-auto flex-1 p-1">
+            <div id="printable-receipt" class="receipt-container {{ 'receipt-80mm' if receipt_paper_size == '80mm' else '' }}">
+                
+                <!-- Store Header -->
+                <div class="text-center">
+                    <h3 id="receipt-store-name" class="font-bold text-sm uppercase tracking-wider">{{ store_name }}</h3>
+                    <p id="receipt-store-address" class="text-[10px] text-slate-600">{{ store_address }}</p>
+                    <p id="receipt-store-phone" class="text-[10px] text-slate-600">Telp: {{ store_phone }}</p>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <!-- Transaction Meta -->
+                <div class="text-[10px] space-y-0.5">
+                    <div class="flex justify-between">
+                        <span>No Faktur:</span>
+                        <span id="receipt-invoice" class="font-bold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Tanggal:</span>
+                        <span id="receipt-date">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Kasir:</span>
+                        <span id="receipt-cashier">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Pelanggan:</span>
+                        <span id="receipt-customer">-</span>
+                    </div>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <!-- Itemized List -->
+                <div id="receipt-items-list" class="space-y-1"></div>
+
+                <div class="receipt-double-divider"></div>
+
+                <!-- Totals & Payment -->
+                <div class="space-y-1 text-xs">
+                    <div class="flex justify-between font-black text-sm">
+                        <span>TOTAL:</span>
+                        <span id="receipt-total">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] pt-1">
+                        <span id="receipt-payment-method">BAYAR (CASH):</span>
+                        <span id="receipt-payment-amount">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-[11px]">
+                        <span>KEMBALIAN:</span>
+                        <span id="receipt-change">Rp 0</span>
+                    </div>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <!-- Footer Note -->
+                <div class="text-center text-[10px] text-slate-600 mt-2 space-y-1">
+                    <p id="receipt-footer-text" class="whitespace-pre-line"></p>
+                    <p class="text-[9px] text-slate-400 font-mono mt-2">=== Layanan Kasir Retail ===</p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Modal Action Footer (Hidden during print) -->
+        <div class="no-print pt-3 mt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+            <button type="button" onclick="posTerminal.closeReceiptModal()"
+                    class="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                Transaksi Baru
+            </button>
+            <button type="button" onclick="posTerminal.printReceipt()"
+                    class="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md transition-colors flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-print"></i>
+                <span>Cetak Struk</span>
+            </button>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    window.POS_PRODUCTS = {{ products | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/pos.js') }}"></script>
+{% endblock %}

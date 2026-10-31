@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ store_name }}{% endblock %} - POS Retail & Inventori</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome 6 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full flex overflow-hidden text-slate-800 antialiased selection:bg-brand-500 selection:text-white">
+
+    {% if current_user %}
+    <!-- SIDEBAR NAVIGATION -->
+    <aside id="sidebar" class="w-64 bg-slate-900 text-slate-200 flex-shrink-0 hidden md:flex flex-col justify-between transition-all duration-300 z-30">
+        <!-- Brand / Header -->
+        <div>
+            <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-800 bg-slate-950/40">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-cash-register text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-white text-base leading-tight tracking-tight">{{ store_name }}</h1>
+                    <span class="text-xs text-brand-400 font-medium">POS & Inventoris</span>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="p-4 space-y-1.5 text-sm font-medium">
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('dashboard') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if request.endpoint == 'dashboard' else 'text-slate-400 hover:text-white hover:bg-slate-800/60' }}">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                    <span>Dashboard</span>
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('pos') }}" class="flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-colors {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if request.endpoint == 'pos' else 'text-slate-400 hover:text-white hover:bg-slate-800/60' }}">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-cart-shopping w-5 text-center"></i>
+                        <span>Kasir (POS)</span>
+                    </div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full {{ 'bg-white/20 text-white' if request.endpoint == 'pos' else 'bg-brand-500/10 text-brand-400 border border-brand-500/20' }}">Faktur</span>
+                </a>
+
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('inventory') }}" class="flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-colors {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if request.endpoint == 'inventory' else 'text-slate-400 hover:text-white hover:bg-slate-800/60' }}">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-boxes-stacked w-5 text-center"></i>
+                        <span>Inventori & Stok</span>
+                    </div>
+                    {% if low_stock_count > 0 %}
+                    <span class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-amber-900 bg-amber-400 rounded-full animate-pulse" title="{{ low_stock_count }} produk stok menipis">
+                        {{ low_stock_count }}
+                    </span>
+                    {% endif %}
+                </a>
+                {% endif %}
+
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('stock_opname') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if request.endpoint == 'stock_opname' else 'text-slate-400 hover:text-white hover:bg-slate-800/60' }}">
+                    <i class="fa-solid fa-clipboard-check w-5 text-center"></i>
+                    <span>Stok Opname & Rugi</span>
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('reports') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if request.endpoint == 'reports' else 'text-slate-400 hover:text-white hover:bg-slate-800/60' }}">
+                    <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i>
+                    <span>Laporan & Riwayat</span>
+                </a>
+
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('settings') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors {{ 'bg-brand-600 text-white shadow-md shadow-brand-600/30' if request.endpoint == 'settings' else 'text-slate-400 hover:text-white hover:bg-slate-800/60' }}">
+                    <i class="fa-solid fa-sliders w-5 text-center"></i>
+                    <span>Pengaturan Toko</span>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+
+        <!-- User Profile Card in Sidebar -->
+        <div class="p-4 border-t border-slate-800 bg-slate-950/30">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 font-bold border border-slate-700 flex-shrink-0">
+                        {{ current_user.full_name[0] }}
+                    </div>
+                    <div class="truncate">
+                        <p class="text-sm font-semibold text-white truncate">{{ current_user.full_name }}</p>
+                        <p class="text-xs text-slate-400 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full {{ 'bg-emerald-400' if current_user.role == 'admin' else 'bg-blue-400' }}"></span>
+                            <span class="capitalize">{{ 'Admin / Pemilik' if current_user.role == 'admin' else 'Kasir' }}</span>
+                        </p>
+                    </div>
+                </div>
+                <a href="{{ url_for('logout') }}" title="Keluar / Logout" class="text-slate-400 hover:text-rose-400 p-2 rounded-lg hover:bg-slate-800 transition-colors">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MOBILE SIDEBAR OVERLAY -->
+    <div id="mobile-sidebar" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden md:hidden">
+        <div class="w-72 bg-slate-900 h-full flex flex-col justify-between p-4">
+            <div>
+                <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold">
+                            <i class="fa-solid fa-cash-register text-sm"></i>
+                        </div>
+                        <span class="font-bold text-white">{{ store_name }}</span>
+                    </div>
+                    <button onclick="toggleMobileMenu()" class="text-slate-400 hover:text-white p-2">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <nav class="mt-4 space-y-2 text-sm">
+                    {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('dashboard') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800">
+                        <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('pos') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800">
+                        <i class="fa-solid fa-cart-shopping w-5"></i> Kasir POS
+                    </a>
+                    {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('inventory') }}" class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-boxes-stacked w-5"></i> Inventori & Stok
+                        </div>
+                        {% if low_stock_count > 0 %}
+                        <span class="px-2 py-0.5 text-xs bg-amber-400 text-amber-950 font-bold rounded-full">{{ low_stock_count }}</span>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+                    {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('stock_opname') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800">
+                        <i class="fa-solid fa-clipboard-check w-5"></i> Stok Opname & Rugi
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('reports') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800">
+                        <i class="fa-solid fa-file-invoice-dollar w-5"></i> Laporan
+                    </a>
+                    {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('settings') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800">
+                        <i class="fa-solid fa-sliders w-5"></i> Pengaturan
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+            <div class="pt-4 border-t border-slate-800 flex items-center justify-between">
+                <span class="text-sm text-slate-300">{{ current_user.full_name }}</span>
+                <a href="{{ url_for('logout') }}" class="text-rose-400 text-sm hover:underline">Logout</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- Topbar for Mobile & Notifications -->
+        {% if current_user %}
+        <header class="h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between flex-shrink-0 z-20">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleMobileMenu()" class="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+                <div class="hidden sm:block">
+                    <h2 class="text-base font-semibold text-slate-800">{% block page_title %}{% endblock %}</h2>
+                    <p class="text-xs text-slate-500">{% block page_subtitle %}{% endblock %}</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- Low Stock Alert Banner in Topbar if any -->
+                {% if low_stock_count > 0 and current_user.role == 'admin' %}
+                <a href="{{ url_for('inventory', status='warning') }}" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold hover:bg-amber-100 transition-colors">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500 animate-pulse"></i>
+                    <span>{{ low_stock_count }} Produk Menipis</span>
+                </a>
+                {% endif %}
+
+                <!-- Quick POS Button if on other pages -->
+                {% if request.endpoint != 'pos' %}
+                <a href="{{ url_for('pos') }}" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-600 text-white text-xs font-bold hover:bg-brand-700 shadow-sm transition-colors">
+                    <i class="fa-solid fa-cash-register"></i>
+                    <span>Buka Kasir</span>
+                </a>
+                {% endif %}
+
+                <!-- Date / Time indicator -->
+                <div class="hidden lg:flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
+                    <i class="fa-regular fa-clock text-slate-400"></i>
+                    <span id="current-clock">--:--</span>
+                </div>
+            </div>
+        </header>
+        {% endif %}
+
+        <!-- Flash Messages -->
+        <div class="px-4 md:px-6 pt-3">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        {% set cat_colors = {
+                            'success': 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                            'danger': 'bg-rose-50 text-rose-800 border-rose-200',
+                            'warning': 'bg-amber-50 text-amber-800 border-amber-200',
+                            'info': 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                        } %}
+                        <div class="mb-3 flex items-center justify-between p-3.5 rounded-xl border text-sm font-medium {{ cat_colors[category] or 'bg-slate-100 text-slate-800 border-slate-200' }} shadow-sm">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid {{ 'fa-circle-check text-emerald-500' if category == 'success' else 'fa-circle-exclamation' }}"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-slate-600">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- Main Body Content -->
+        <main class="flex-1 overflow-y-auto px-4 md:px-6 py-4">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Common Scripts -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-sidebar');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        // Clock updater
+        function updateClock() {
+            const el = document.getElementById('current-clock');
+            if (el) {
+                const now = new Date();
+                el.innerText = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

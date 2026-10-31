@@ -1,0 +1,97 @@
+/* Custom Application Styles */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+    --font-sans: 'Plus Jakarta Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+    font-family: var(--font-sans);
+}
+
+.font-mono {
+    font-family: var(--font-mono);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Thermal Receipt Styling */
+.receipt-container {
+    width: 320px;
+    background: #ffffff;
+    padding: 16px;
+    margin: 0 auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.4;
+    color: #111827;
+    border: 1px dashed #cbd5e1;
+}
+
+.receipt-container.receipt-80mm {
+    width: 400px;
+    font-size: 13px;
+}
+
+.receipt-divider {
+    border-top: 1px dashed #64748b;
+    margin: 8px 0;
+}
+
+.receipt-double-divider {
+    border-top: 1px double #334155;
+    margin: 8px 0;
+}
+
+/* Print Specific Rules */
+@media print {
+    body * {
+        visibility: hidden !important;
+    }
+    #thermal-receipt-modal, #thermal-receipt-modal * {
+        visibility: visible !important;
+    }
+    #thermal-receipt-modal {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+    }
+    .modal-backdrop, .no-print {
+        display: none !important;
+    }
+    .receipt-container {
+        border: none !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 58mm !important;
+        padding: 2mm !important;
+        margin: 0 auto !important;
+    }
+    .receipt-container.receipt-80mm {
+        max-width: 80mm !important;
+    }
+    @page {
+        margin: 0;
+        size: auto;
+    }
+}
